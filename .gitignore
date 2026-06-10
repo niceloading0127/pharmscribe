@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# 运行时产物(用户的视频笔记、知识库、抽帧等不应进仓库)
+work/
+*.db
+*.docx
+*.srt
+*.wav
+*.mp4
+frames/
+video_work/
+
+# 系统文件
+.DS_Store
