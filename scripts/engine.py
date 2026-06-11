@@ -29,6 +29,15 @@ Return ONLY a JSON array (no prose, no markdown fences). Each element:
   "term_en": "English term", "term_zh": "中文术语 (if a standard one exists, else empty)",
   "explanation_zh": "2-4 sentence study-ready explanation in Chinese",
   {tag_fields}}}
+
+CRITICAL — TAGS ARE REQUIRED: the tag arrays ({tag_keys}) are the most important
+fields. For EVERY entry you MUST fill at least one or two of them with the actual
+named entities mentioned (lowercase). Never return all tag arrays empty. Pull
+every relevant {tag_examples} you can identify from the term and explanation.
+
+Example of ONE well-formed entry (follow this shape and tagging discipline):
+{example}
+
 Extract only substantive knowledge (definitions, mechanisms, methods, worked examples, key distinctions).
 Drop filler, admin, greetings, repetition. If the segment has no real content, return [].
 Use the timestamp given for the segment start. Keep technical terms accurate; do not invent facts."""
@@ -38,12 +47,33 @@ DOMAIN_PRESETS = {
         "domain": "pharmacology / pharmaceutical science",
         "categories": "mechanism, PK, PD, SAR, indication, contraindication, ADR, interaction, concept",
         "tag_fields": '"drugs": [], "targets": [], "pathways": [], "topics": []',
+        "tag_keys": "drugs, targets, pathways, topics",
+        "tag_examples": "drug names, receptors/enzymes/proteins (targets), metabolic pathways",
+        "example": ('{"ts_seconds": 1450, "ts_hhmmss": "00:24:10", "category": "interaction", '
+                    '"term_en": "CYP3A4 inhibition", "term_zh": "CYP3A4 抑制", '
+                    '"explanation_zh": "酮康唑强效抑制肝脏 CYP3A4,使经该酶代谢的药物血药浓度升高。", '
+                    '"drugs": ["ketoconazole"], "targets": ["cyp3a4"], '
+                    '"pathways": ["hepatic metabolism"], "topics": ["drug interaction"]}'),
     },
     "finance": {
         "domain": "economics / finance",
         "categories": "concept, model, formula, mechanism, metric, application, risk, other",
         "tag_fields": '"concepts": [], "models": [], "metrics": [], "markets": [], "topics": []',
+        "tag_keys": "concepts, models, metrics, markets, topics",
+        "tag_examples": "core concepts, named models/theories, metrics/ratios, markets/instruments",
+        "example": ('{"ts_seconds": 540, "ts_hhmmss": "00:09:00", "category": "model", '
+                    '"term_en": "Capital Asset Pricing Model", "term_zh": "资本资产定价模型", '
+                    '"explanation_zh": "用系统性风险 beta 解释资产预期收益:E(R)=Rf+β(Rm−Rf)。", '
+                    '"concepts": ["systematic risk"], "models": ["capm"], '
+                    '"metrics": ["beta", "expected return"], "markets": ["equities"], '
+                    '"topics": ["valuation"]}'),
     },
+}
+
+# tag json-keys per domain, used by the code-side fallback
+DOMAIN_TAG_KEYS = {
+    "pharma": ["drugs", "targets", "pathways", "topics"],
+    "finance": ["concepts", "models", "metrics", "markets", "topics"],
 }
 
 
@@ -56,9 +86,23 @@ def build_prompt(domain_key, segment_text, ts_seconds, ts_hhmmss):
 
 
 def _extract_json_array(text):
-    """Pull the first JSON array out of a model response, tolerating stray prose."""
+    """Pull a JSON array out of a model response, tolerating stray prose and the
+    {"entries": [...]} object wrapper that JSON-mode backends produce."""
     text = text.strip()
     text = re.sub(r"^```(?:json)?|```$", "", text, flags=re.MULTILINE).strip()
+    # Case 1: an object wrapper like {"entries": [...]}
+    if text.lstrip().startswith("{"):
+        try:
+            obj = json.loads(text)
+            for key in ("entries", "items", "data", "results"):
+                if isinstance(obj.get(key), list):
+                    return obj[key]
+            # a single entry object -> wrap it
+            if "term_en" in obj:
+                return [obj]
+        except json.JSONDecodeError:
+            pass
+    # Case 2: a bare array
     start = text.find("[")
     end = text.rfind("]")
     if start == -1 or end == -1:
@@ -98,12 +142,17 @@ def call_gemini(sys_p, user_p, model="gemini-1.5-flash"):
 
 def call_local(sys_p, user_p, model=None):
     """Local model via Ollama's HTTP API. No key, no membership.
-    Install: https://ollama.com ; then e.g. `ollama pull qwen2.5`."""
+    Install: https://ollama.com ; then e.g. `ollama pull qwen2.5`.
+    Uses format=json so even small models return parseable JSON."""
     model = model or os.environ.get("PHARMSCRIBE_LOCAL_MODEL", "qwen2.5")
+    # Ollama's format=json forces a single JSON value; ask for an object that
+    # wraps the array so the constraint is satisfiable, then unwrap below.
+    user_p2 = user_p + '\n\nReturn a JSON object of the form {"entries": [ ... ]}.'
     payload = json.dumps({
-        "model": model, "stream": False,
+        "model": model, "stream": False, "format": "json",
+        "options": {"temperature": 0.1},
         "messages": [{"role": "system", "content": sys_p},
-                     {"role": "user", "content": user_p}],
+                     {"role": "user", "content": user_p2}],
     }).encode()
     req = urllib.request.Request("http://localhost:11434/api/chat", data=payload,
                                  headers={"Content-Type": "application/json"})
@@ -135,6 +184,59 @@ def call_none(sys_p, user_p, model=None):
 BACKENDS = {"claude": call_claude, "openai": call_openai, "gemini": call_gemini,
             "local": call_local, "none": call_none}
 
+# Small known-entity lexicons used ONLY as a last-resort backfill when the model
+# returns an entry with all tag arrays empty. Lowercase, matched as whole words.
+# Not exhaustive — just enough to keep cross-retrieval working on common terms.
+LEXICON = {
+    "pharma": {
+        "targets": ["cyp3a4", "cyp2d6", "cyp2c9", "cyp1a2", "cyp51", "p-gp",
+                    "p-glycoprotein", "oatp", "hmg-coa reductase", "ace",
+                    "beta receptor", "gaba", "nmda", "cox-1", "cox-2"],
+        "pathways": ["hepatic metabolism", "first-pass metabolism", "renal excretion",
+                     "glucuronidation", "oxidation", "absorption", "distribution",
+                     "metabolism", "excretion", "ergosterol biosynthesis",
+                     "肝代谢", "首过代谢", "肾排泄", "葡萄糖醛酸化", "氧化", "吸收", "分布", "代谢", "排泄"],
+        "topics": ["drug interaction", "bioavailability", "half-life", "clearance",
+                   "adme", "toxicity", "dosing", "pharmacokinetics", "pharmacodynamics",
+                   "药物相互作用", "生物利用度", "半衰期", "清除率", "毒性", "肝毒性",
+                   "给药", "药代动力学", "药效动力学", "不良反应", "适应症", "禁忌"],
+    },
+    "finance": {
+        "models": ["capm", "wacc", "dcf", "black-scholes", "is-lm", "solow",
+                   "资本资产定价模型", "加权平均资本成本"],
+        "metrics": ["beta", "p/e", "sharpe ratio", "duration", "gdp", "cpi",
+                    "roe", "roi", "irr", "npv", "yield",
+                    "贝塔", "市盈率", "夏普比率", "久期", "收益率", "波动率", "相关性"],
+        "markets": ["equities", "bonds", "options", "derivatives", "forex", "fx",
+                    "commodities", "futures",
+                    "股票", "债券", "期权", "衍生品", "外汇", "大宗商品", "期货"],
+        "topics": ["valuation", "risk management", "monetary policy", "diversification",
+                   "portfolio", "arbitrage", "liquidity",
+                   "估值", "风险管理", "货币政策", "分散化", "投资组合", "套利", "流动性"],
+    },
+}
+
+
+def _backfill_tags(domain_key, entry):
+    """If a model entry has all tag arrays empty, scan its term+explanation against
+    a small lexicon and fill what we can find. Keeps cross-retrieval working even
+    when a small local model forgets to tag."""
+    keys = DOMAIN_TAG_KEYS[domain_key]
+    has_any = any(entry.get(k) for k in keys)
+    if has_any:
+        return entry
+    blob = (entry.get("term_en", "") + " " + entry.get("term_zh", "") + " " +
+            entry.get("explanation_zh", "")).lower()
+    lex = LEXICON.get(domain_key, {})
+    for tag_type, words in lex.items():
+        found = [w for w in words if re.search(r"(?<![a-z0-9])" + re.escape(w) + r"(?![a-z0-9])", blob)]
+        if found:
+            entry[tag_type] = sorted(set(found))
+    # last resort: if still nothing, at least tag the term itself as a topic
+    if not any(entry.get(k) for k in keys) and entry.get("term_en"):
+        entry["topics"] = [entry["term_en"].strip().lower()]
+    return entry
+
 
 def extract(domain_key, segment_text, ts_seconds, ts_hhmmss,
             engine=None, model=None):
@@ -149,7 +251,8 @@ def extract(domain_key, segment_text, ts_seconds, ts_hhmmss,
                  f"See README for the pip/install command.")
     except Exception as e:
         sys.exit(f"Engine '{engine}' failed: {e}")
-    return _extract_json_array(raw)
+    entries = _extract_json_array(raw)
+    return [_backfill_tags(domain_key, e) for e in entries if isinstance(e, dict)]
 
 
 if __name__ == "__main__":
