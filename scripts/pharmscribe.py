@@ -22,6 +22,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import engine  # noqa: E402
+import preprocess  # noqa: E402
 
 DEFAULT_KB = os.path.expanduser("~/pharmscribe-data/kb.db")
 
@@ -62,14 +63,22 @@ def cmd_ingest(args):
     with open(os.path.join(work, "chunks.json"), encoding="utf-8") as f:
         chunks = json.load(f)["chunks"]
 
+    # --- token-saving preprocessing (rule-based, zero tokens) ---
+    if args.no_preprocess:
+        packed = [c for c in chunks if c.get("transcript", "").strip()]
+    else:
+        packed = preprocess.pack_chunks(
+            chunks, target_words=args.batch_words, min_words=args.min_words)
+        print(preprocess.report(chunks, packed))
+
     vid, title, dur = video_meta(args.url)
     print(f"\n提炼引擎 Engine = {args.engine} · 领域 Domain = {args.domain} · "
-          f"{len(chunks)} 段待处理\n")
+          f"{len(packed)} 批待处理\n")
     all_entries = []
-    for i, ch in enumerate(chunks, 1):
+    for i, ch in enumerate(packed, 1):
         if not ch.get("transcript", "").strip():
             continue
-        print(f"  [{i}/{len(chunks)}] {ch['start']} 提炼中 ...")
+        print(f"  [{i}/{len(packed)}] {ch['start']} 提炼中 ...")
         ents = engine.extract(args.domain, ch["transcript"],
                               ch["start_seconds"], ch["start"],
                               engine=args.engine, model=args.model)
@@ -125,6 +134,12 @@ def main():
     pi.add_argument("--course", default=None)
     pi.add_argument("--workdir", default=None)
     pi.add_argument("--no-frames", action="store_true", help="captions only, skip video/frames")
+    pi.add_argument("--no-preprocess", action="store_true",
+                    help="disable token-saving cleaning/skipping/batching")
+    pi.add_argument("--batch-words", type=int, default=700,
+                    help="merge segments into batches of ~this many words (default 700)")
+    pi.add_argument("--min-words", type=int, default=12,
+                    help="skip segments shorter than this after cleaning (default 12)")
     pi.set_defaults(fn=cmd_ingest)
 
     pq = sub.add_parser("query", help="cross-query the knowledge base")

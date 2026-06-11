@@ -189,17 +189,82 @@ BACKENDS = {"claude": call_claude, "openai": call_openai, "gemini": call_gemini,
 # Not exhaustive — just enough to keep cross-retrieval working on common terms.
 LEXICON = {
     "pharma": {
-        "targets": ["cyp3a4", "cyp2d6", "cyp2c9", "cyp1a2", "cyp51", "p-gp",
-                    "p-glycoprotein", "oatp", "hmg-coa reductase", "ace",
-                    "beta receptor", "gaba", "nmda", "cox-1", "cox-2"],
-        "pathways": ["hepatic metabolism", "first-pass metabolism", "renal excretion",
-                     "glucuronidation", "oxidation", "absorption", "distribution",
-                     "metabolism", "excretion", "ergosterol biosynthesis",
-                     "肝代谢", "首过代谢", "肾排泄", "葡萄糖醛酸化", "氧化", "吸收", "分布", "代谢", "排泄"],
-        "topics": ["drug interaction", "bioavailability", "half-life", "clearance",
-                   "adme", "toxicity", "dosing", "pharmacokinetics", "pharmacodynamics",
-                   "药物相互作用", "生物利用度", "半衰期", "清除率", "毒性", "肝毒性",
-                   "给药", "药代动力学", "药效动力学", "不良反应", "适应症", "禁忌"],
+        # ---- 分子靶点:受体 / 酶 / 转运体 / 离子通道 ----
+        "targets": [
+            # CYP 及代谢酶
+            "cyp3a4", "cyp2d6", "cyp2c9", "cyp2c19", "cyp1a2", "cyp2e1", "cyp2b6", "cyp51",
+            # 受体
+            "beta receptor", "alpha receptor", "muscarinic receptor", "nicotinic receptor",
+            "dopamine receptor", "serotonin receptor", "5-ht", "histamine receptor", "h1", "h2",
+            "opioid receptor", "adrenergic receptor", "gaba", "nmda", "glutamate receptor",
+            # 酶
+            "cox-1", "cox-2", "ace", "hmg-coa reductase", "acetylcholinesterase",
+            "monoamine oxidase", "mao", "phosphodiesterase", "pde5", "dna gyrase",
+            "topoisomerase", "dihydrofolate reductase", "na-k-atpase", "proton pump",
+            "xanthine oxidase", "beta-lactamase",
+            # 转运体 / 通道
+            "p-gp", "p-glycoprotein", "oatp", "bcrp", "oct", "oat",
+            "sodium channel", "calcium channel", "potassium channel",
+            # 中文
+            "受体", "转运体", "离子通道", "钠通道", "钙通道", "钾通道",
+            "乙酰胆碱酯酶", "单胺氧化酶", "环氧合酶", "磷酸二酯酶", "质子泵", "拓扑异构酶",
+        ],
+        # ---- 通路:代谢 / 生物合成 / 信号 / 药剂过程 ----
+        "pathways": [
+            # 代谢
+            "hepatic metabolism", "first-pass metabolism", "renal excretion", "biliary excretion",
+            "phase i metabolism", "phase ii metabolism", "glucuronidation", "sulfation",
+            "acetylation", "methylation", "oxidation", "conjugation",
+            "absorption", "distribution", "metabolism", "excretion",
+            # 生物合成 / 微生物
+            "cell wall synthesis", "peptidoglycan synthesis", "folate synthesis",
+            "protein synthesis", "ergosterol biosynthesis",
+            # 信号
+            "signal transduction", "second messenger", "camp", "gpcr signaling",
+            # 药剂过程
+            "dissolution", "disintegration", "sustained release", "controlled release",
+            # 中文
+            "肝代谢", "首过代谢", "肾排泄", "胆汁排泄", "I相代谢", "II相代谢",
+            "葡萄糖醛酸化", "结合反应", "乙酰化", "甲基化", "氧化", "吸收", "分布", "代谢", "排泄",
+            "细胞壁合成", "蛋白质合成", "信号转导", "崩解", "溶出", "缓释", "控释",
+        ],
+        # ---- 主题:按学科分组 ----
+        "topics": [
+            # 药理学 / 药效学
+            "mechanism of action", "agonist", "antagonist", "partial agonist",
+            "receptor binding", "dose-response", "efficacy", "potency", "affinity",
+            "therapeutic index", "selectivity",
+            "激动剂", "拮抗剂", "部分激动剂", "量效关系", "效价", "亲和力", "选择性", "治疗指数",
+            # 药代动力学
+            "bioavailability", "half-life", "clearance", "volume of distribution",
+            "auc", "cmax", "tmax", "steady state", "first-order kinetics", "zero-order kinetics",
+            "pharmacokinetics", "pharmacodynamics",
+            "生物利用度", "半衰期", "清除率", "表观分布容积", "稳态", "药代动力学", "药效动力学",
+            # 药物化学
+            "structure-activity relationship", "sar", "pharmacophore", "prodrug",
+            "chirality", "functional group", "lead compound", "bioisostere", "drug design",
+            "构效关系", "药效团", "前药", "手性", "官能团", "先导化合物", "药物设计",
+            # 药剂学
+            "dosage form", "tablet", "capsule", "suspension", "emulsion", "ointment",
+            "bioequivalence", "excipient", "formulation", "stability",
+            "剂型", "片剂", "胶囊", "混悬剂", "乳剂", "软膏", "生物等效性", "辅料", "处方", "稳定性",
+            # 药物分析
+            "hplc", "lc-ms", "uv spectroscopy", "titration", "chromatography",
+            "mass spectrometry", "assay", "purity",
+            "高效液相色谱", "质谱", "紫外", "滴定", "色谱", "含量测定", "纯度",
+            # 生药学 / 天然药物
+            "alkaloid", "glycoside", "flavonoid", "terpenoid", "saponin", "volatile oil",
+            "生物碱", "苷类", "黄酮", "萜类", "皂苷", "挥发油",
+            # 临床药学 / 治疗
+            "drug interaction", "adverse drug reaction", "contraindication", "indication",
+            "dosing regimen", "toxicity", "hepatotoxicity", "nephrotoxicity",
+            "药物相互作用", "不良反应", "禁忌症", "适应症", "给药方案", "毒性", "肝毒性", "肾毒性",
+            # 抗菌 / 微生物
+            "antibiotic resistance", "mic", "spectrum of activity",
+            "耐药性", "最低抑菌浓度", "抗菌谱",
+            # 通用
+            "adme", "dosing", "bioavailability",
+        ],
     },
     "finance": {
         "models": ["capm", "wacc", "dcf", "black-scholes", "is-lm", "solow",
