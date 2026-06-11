@@ -189,7 +189,7 @@ BACKENDS = {"claude": call_claude, "openai": call_openai, "gemini": call_gemini,
 # Not exhaustive — just enough to keep cross-retrieval working on common terms.
 LEXICON = {
     "pharma": {
-        # ---- 分子靶点:受体 / 酶 / 转运体 / 离子通道 ----
+        # ============ 分子靶点:受体 / 酶 / 转运体 / 通道 ============
         "targets": [
             # CYP 及代谢酶
             "cyp3a4", "cyp2d6", "cyp2c9", "cyp2c19", "cyp1a2", "cyp2e1", "cyp2b6", "cyp51",
@@ -197,19 +197,21 @@ LEXICON = {
             "beta receptor", "alpha receptor", "muscarinic receptor", "nicotinic receptor",
             "dopamine receptor", "serotonin receptor", "5-ht", "histamine receptor", "h1", "h2",
             "opioid receptor", "adrenergic receptor", "gaba", "nmda", "glutamate receptor",
+            "insulin receptor", "estrogen receptor", "glucocorticoid receptor", "egfr", "vegf",
             # 酶
             "cox-1", "cox-2", "ace", "hmg-coa reductase", "acetylcholinesterase",
             "monoamine oxidase", "mao", "phosphodiesterase", "pde5", "dna gyrase",
             "topoisomerase", "dihydrofolate reductase", "na-k-atpase", "proton pump",
-            "xanthine oxidase", "beta-lactamase",
+            "xanthine oxidase", "beta-lactamase", "kinase", "tyrosine kinase",
             # 转运体 / 通道
             "p-gp", "p-glycoprotein", "oatp", "bcrp", "oct", "oat",
             "sodium channel", "calcium channel", "potassium channel",
             # 中文
             "受体", "转运体", "离子通道", "钠通道", "钙通道", "钾通道",
             "乙酰胆碱酯酶", "单胺氧化酶", "环氧合酶", "磷酸二酯酶", "质子泵", "拓扑异构酶",
+            "胰岛素受体", "雌激素受体", "酪氨酸激酶",
         ],
-        # ---- 通路:代谢 / 生物合成 / 信号 / 药剂过程 ----
+        # ============ 通路:代谢 / 生物合成 / 信号 / 药剂工艺 ============
         "pathways": [
             # 代谢
             "hepatic metabolism", "first-pass metabolism", "renal excretion", "biliary excretion",
@@ -218,52 +220,90 @@ LEXICON = {
             "absorption", "distribution", "metabolism", "excretion",
             # 生物合成 / 微生物
             "cell wall synthesis", "peptidoglycan synthesis", "folate synthesis",
-            "protein synthesis", "ergosterol biosynthesis",
-            # 信号
+            "protein synthesis", "ergosterol biosynthesis", "dna replication",
+            # 信号 / 分子
             "signal transduction", "second messenger", "camp", "gpcr signaling",
-            # 药剂过程
+            "transcription", "translation", "gene expression", "apoptosis",
+            # 药剂工艺
             "dissolution", "disintegration", "sustained release", "controlled release",
+            "granulation", "coating", "lyophilization", "encapsulation",
             # 中文
             "肝代谢", "首过代谢", "肾排泄", "胆汁排泄", "I相代谢", "II相代谢",
             "葡萄糖醛酸化", "结合反应", "乙酰化", "甲基化", "氧化", "吸收", "分布", "代谢", "排泄",
-            "细胞壁合成", "蛋白质合成", "信号转导", "崩解", "溶出", "缓释", "控释",
+            "细胞壁合成", "蛋白质合成", "信号转导", "基因表达", "转录", "翻译", "凋亡",
+            "崩解", "溶出", "缓释", "控释", "制粒", "包衣", "冻干",
         ],
-        # ---- 主题:按学科分组 ----
+        # ============ 主题:按学科分组 ============
         "topics": [
-            # 药理学 / 药效学
-            "mechanism of action", "agonist", "antagonist", "partial agonist",
+            # ---- 药理学总论 / 药效学 ----
+            "mechanism of action", "agonist", "antagonist", "partial agonist", "inverse agonist",
             "receptor binding", "dose-response", "efficacy", "potency", "affinity",
-            "therapeutic index", "selectivity",
+            "therapeutic index", "selectivity", "tolerance", "dependence",
             "激动剂", "拮抗剂", "部分激动剂", "量效关系", "效价", "亲和力", "选择性", "治疗指数",
-            # 药代动力学
+            "耐受性", "依赖性",
+            # ---- 药理学各论(系统药理)----
+            "sympathomimetic", "cholinergic", "adrenergic blocker", "antihypertensive",
+            "diuretic", "antiarrhythmic", "anticoagulant", "statin", "beta blocker",
+            "calcium channel blocker", "sedative", "anxiolytic", "antipsychotic",
+            "antidepressant", "anticonvulsant", "anesthetic", "analgesic", "opioid",
+            "nsaid", "corticosteroid", "insulin", "antibiotic", "antiviral", "antifungal",
+            "拟交感", "拟胆碱", "抗高血压", "利尿剂", "抗心律失常", "抗凝", "他汀",
+            "镇静催眠", "抗精神病", "抗抑郁", "抗惊厥", "麻醉", "镇痛", "阿片",
+            "糖皮质激素", "胰岛素", "抗生素", "抗病毒", "抗真菌",
+            # ---- 药代动力学 ----
             "bioavailability", "half-life", "clearance", "volume of distribution",
             "auc", "cmax", "tmax", "steady state", "first-order kinetics", "zero-order kinetics",
-            "pharmacokinetics", "pharmacodynamics",
+            "pharmacokinetics", "pharmacodynamics", "protein binding", "loading dose",
             "生物利用度", "半衰期", "清除率", "表观分布容积", "稳态", "药代动力学", "药效动力学",
-            # 药物化学
+            "血浆蛋白结合", "负荷剂量",
+            # ---- 药物化学 ----
             "structure-activity relationship", "sar", "pharmacophore", "prodrug",
             "chirality", "functional group", "lead compound", "bioisostere", "drug design",
-            "构效关系", "药效团", "前药", "手性", "官能团", "先导化合物", "药物设计",
-            # 药剂学
+            "molecular docking", "stereochemistry",
+            "构效关系", "药效团", "前药", "手性", "官能团", "先导化合物", "药物设计", "立体化学",
+            # ---- 生物化学 / 分子生物学 ----
+            "enzyme kinetics", "michaelis-menten", "km", "vmax", "substrate", "cofactor",
+            "competitive inhibition", "noncompetitive inhibition",
+            "酶动力学", "米氏方程", "底物", "辅因子", "竞争性抑制", "非竞争性抑制",
+            # ---- 药剂学 ----
             "dosage form", "tablet", "capsule", "suspension", "emulsion", "ointment",
-            "bioequivalence", "excipient", "formulation", "stability",
-            "剂型", "片剂", "胶囊", "混悬剂", "乳剂", "软膏", "生物等效性", "辅料", "处方", "稳定性",
-            # 药物分析
+            "bioequivalence", "excipient", "formulation", "stability", "solubility",
+            "nanoparticle", "liposome", "microsphere", "drug delivery",
+            "剂型", "片剂", "胶囊", "混悬剂", "乳剂", "软膏", "生物等效性", "辅料", "处方",
+            "稳定性", "溶解度", "纳米粒", "脂质体", "微球", "药物递送", "靶向给药",
+            # ---- 药物分析 ----
             "hplc", "lc-ms", "uv spectroscopy", "titration", "chromatography",
-            "mass spectrometry", "assay", "purity",
-            "高效液相色谱", "质谱", "紫外", "滴定", "色谱", "含量测定", "纯度",
-            # 生药学 / 天然药物
+            "mass spectrometry", "assay", "purity", "validation", "calibration",
+            "高效液相色谱", "质谱", "紫外", "滴定", "色谱", "含量测定", "纯度", "方法学验证",
+            # ---- 生药学 / 天然药物 ----
             "alkaloid", "glycoside", "flavonoid", "terpenoid", "saponin", "volatile oil",
-            "生物碱", "苷类", "黄酮", "萜类", "皂苷", "挥发油",
-            # 临床药学 / 治疗
+            "natural product", "extraction", "phytochemistry",
+            "生物碱", "苷类", "黄酮", "萜类", "皂苷", "挥发油", "天然产物", "提取", "道地药材",
+            # ---- 药物毒理学 ----
+            "toxicology", "ld50", "teratogenicity", "carcinogenicity", "mutagenicity",
+            "dose-limiting toxicity", "overdose", "antidote",
+            "毒理学", "半数致死量", "致畸", "致癌", "致突变", "过量", "解毒剂",
+            # ---- 免疫 / 生物制药 ----
+            "antibody", "monoclonal antibody", "vaccine", "antigen", "immunogenicity",
+            "biologics", "recombinant", "biosimilar",
+            "抗体", "单克隆抗体", "疫苗", "抗原", "免疫原性", "生物制剂", "重组", "生物类似药",
+            # ---- 临床药学 / 治疗 ----
             "drug interaction", "adverse drug reaction", "contraindication", "indication",
             "dosing regimen", "toxicity", "hepatotoxicity", "nephrotoxicity",
+            "therapeutic drug monitoring", "renal impairment", "hepatic impairment",
             "药物相互作用", "不良反应", "禁忌症", "适应症", "给药方案", "毒性", "肝毒性", "肾毒性",
-            # 抗菌 / 微生物
-            "antibiotic resistance", "mic", "spectrum of activity",
-            "耐药性", "最低抑菌浓度", "抗菌谱",
-            # 通用
-            "adme", "dosing", "bioavailability",
+            "血药浓度监测", "肾功能不全", "肝功能不全",
+            # ---- 抗菌 / 微生物 ----
+            "antibiotic resistance", "mic", "spectrum of activity", "bactericidal",
+            "bacteriostatic",
+            "耐药性", "最低抑菌浓度", "抗菌谱", "杀菌", "抑菌",
+            # ---- 药事管理 / 法规 / 流行病学 ----
+            "gmp", "gcp", "pharmacovigilance", "clinical trial", "regulatory",
+            "incidence", "prevalence", "relative risk", "confidence interval",
+            "药品生产质量管理规范", "药物警戒", "临床试验", "药品监管",
+            "发病率", "患病率", "相对危险度", "置信区间",
+            # ---- 通用 ----
+            "adme", "dosing", "drug metabolism",
         ],
     },
     "finance": {
